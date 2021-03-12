@@ -1,0 +1,85 @@
+---
+title: "EDA - Primer Pase"
+output: html_notebook
+---
+
+
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+
+# Libraries
+
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(visdat)
+library(stringr)
+library(stringi)
+
+# Read dataset
+df_ansiedadie <- read_excel("data/raw/IE + Ansiedad.xlsx")
+
+
+# Data Wrangling 
+
+# Cambiar nombre de columnas a un formato comun
+colnames(df_ansiedadie) <-   df_ansiedadie %>%
+  colnames() %>% 
+  tolower() %>% 
+  str_replace_all(" ", "_") %>%  # Reemplazar espacios en blanco por underscores
+  str_replace_all("\\[|\\]|\\?|\\¿|\\(|\\)|\\,", "") %>% # Eliminar caracteres raros
+  stri_trans_general("Latin-ASCII") # Eliminar tildes
+
+# Renombrar columnas a nombres mas cortos
+
+df_ansiedadie<- df_ansiedadie %>% 
+  rename(ingreso_mensual_usd = ingreso_mensual_expresado_en_dolares,
+         graff_condiciones_vivienda = condiciones_de_la_vivienda,
+         graff_profesion_jefe_familia = profesion_del_jefe_de_familia,
+         graff_nivel_instruccion_madre = nivel_de_instruccion_de_la_madre,
+         graff_fuente_ingreso_familia = principal_fuente_de_ingreso_de_la_familia,
+         percibe_situacion_actual = como_percibe_la_situacion_actual_del_pais,
+         percibe_situacion_econ = como_esta_su_situacion_economica,
+         nucleo_familiar_venezuela = tiene_algun_familiar_en_venezuela_nucleo_mama_papa_o_hermanos
+  )
+
+# Seleccionar variables sociodemograficas
+
+df_ansiedadie_sociodemo <- df_ansiedadie %>% 
+  select(sexo,
+         periodo,
+         estado_civil,
+         nombre,
+         edad,
+         nivel_educativo,
+         ingreso_mensual_usd,
+         graff_condiciones_vivienda,
+         graff_profesion_jefe_familia,
+         graff_nivel_instruccion_madre,
+         graff_fuente_ingreso_familia,
+         percibe_situacion_actual,
+         percibe_situacion_econ,
+         nucleo_familiar_venezuela
+         )
+
+```
+
+# Exploración de Datos
+
+
+## Exploración de datos inicial
+
+
+### Valores ausentes
+
+```{r fig.height=7, message=FALSE, warning=FALSE}
+
+# Cantidad de Valores Nulos según columna
+df_ansiedadie_sociodemo %>% 
+  vis_miss() +
+    theme(axis.text.x=element_text(angle=45)) +
+    theme(plot.margin=unit(c(2,3,1.5,1.2),"cm"))
+
+```
+
+### Outliers
+
