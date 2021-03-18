@@ -1,8 +1,10 @@
 ---
 title: "EDA - Primer Pase"
 output:
-  pdf_document: default
+  html_document:
+    df_print: paged
   html_notebook: default
+  pdf_document: default
 ---
 
 ```{r, echo = FALSE, message=FALSE, warning=FALSE}
@@ -313,7 +315,7 @@ df_congreso_modelling <- df_congreso_clean %>%
   )
 
 
-lm_ansiedad_all <- lm(ansiedad_estado ~ ., data = df_congreso_modelling)
+# lm_ansiedad_all <- lm(ansiedad_estado ~ ., data = df_congreso_modelling)
 
-car::vif(lm_ansiedad_all)
+# car::vif(lm_ansiedad_all)
 ```
