@@ -103,12 +103,12 @@ df_congreso %>%
 
 Variables que se ven más afectadas por outliers:
 
-- `ingreso_aproximado_familia_usd`
-- `ingreso_mensual_usd`
-- `ansiedad_rasgo`
-- `emociones_adaptativas`
-- `ansiedad_estado`
-- `regulacion_emocional`
+-   `ingreso_aproximado_familia_usd`
+-   `ingreso_mensual_usd`
+-   `ansiedad_rasgo`
+-   `emociones_adaptativas`
+-   `ansiedad_estado`
+-   `regulacion_emocional`
 
 ```{r}
 
@@ -132,15 +132,15 @@ df_congreso[outliers_univariate$variables] %>%
 
 #### Outliers por variable:
 
-- `ingreso_aproximado_familia_usd`: Es la variable más problemática a nivel de Outliers.
-  - Un sujeto ingresó un ingreso familiar de `2.719383e+34`. Se ha eliminado este valor
-  - Método de imputación: Eliminar  
+-   `ingreso_aproximado_familia_usd`: Es la variable más problemática a nivel de Outliers.
+
+    -   Un sujeto ingresó un ingreso familiar de `2.719383e+34`. Se ha eliminado este valor
+    -   Método de imputación: Eliminar
 
 ```{r}
 df_congreso %>%
   dlookr::plot_outlier()
 ```
-
 
 ```{r}
 
@@ -162,15 +162,16 @@ get_outlier_threshold <- function(dataframe, variable_name) {
 out_ingreso_familiar_thresh <- get_outlier_threshold(df_congreso, "ingreso_aproximado_familia_usd")
 out_ingreso_mensual_thresh <- get_outlier_threshold(df_congreso, "ingreso_mensual_usd")
 
+## Verificando que estoy haciendo subset de los valores correctos
 
-df_congreso %>%
-  filter(ingreso_aproximado_familia_usd > out_ingreso_familiar_thresh[2]) %>%
-  select(ingreso_aproximado_familia_usd)
-
-df_congreso %>%
-  filter(ingreso_mensual_usd > out_ingreso_mensual_thresh[2]) %>%
-  select(ingreso_mensual_usd) %>%
-  arrange(desc(ingreso_mensual_usd))
+# df_congreso %>%
+#   filter(ingreso_aproximado_familia_usd > out_ingreso_familiar_thresh[2]) %>%
+#   select(ingreso_aproximado_familia_usd)
+# 
+# df_congreso %>%
+#   filter(ingreso_mensual_usd > out_ingreso_mensual_thresh[2]) %>%
+#   select(ingreso_mensual_usd) %>%
+#   arrange(desc(ingreso_mensual_usd))
 
 
 # Reeemplazar dichos valores con NA
@@ -189,28 +190,25 @@ df_congreso_clean <- df_congreso %>%
 
 ```
 
-
 ### Ansiedad
 
 ```{r}
 
 ```
 
-
 ## Supuestos
 
-Ansiedad estado es estadísticamente significativo 
+Ansiedad estado es estadísticamente significativo
 
 ```{r}
 shapiro.test(df_congreso_clean$ansiedad_estado)
 ```
 
-
 ## Comparación de Medias
 
 ### Período
 
-El período únicamente tiene una relación estadísticamente significativa con la `ansiedad_estado` y `regulacion_emocional`
+El período únicamente tiene una relación estadísticamente significativa con la `ansiedad_estado` y `regulacion_emocional`. **No** continuaré analizando el `período` como ha sido segmentado en la data recolectada.
 
 ```{r}
 
@@ -245,18 +243,16 @@ df_congreso_clean %>%
   ggbetweenstats(x = periodo, y = atencion_emocional, effsize.type = "eta")
 ```
 
+### VI: Variables Baremo VD: Ansiedad
 
-### VI: Variables Baremo VD: Ansiedad 
+-   `braemo_emociones_adaptativas` tiene `p valor` sumamente bajo y un eta cuadrado parcial fuerte.
 
-- `braemo_emociones_adaptativas` tiene p valor sumamente bajo y un eta cuadrado parcial fuerte.
-   - Posibles problemas: 
-    - Los grupos `baremo_emociones_adaptativas` no están equitativamente distribuidos.
-    -
-   
-   
-```{r}
+    -   Posibles problemas:
+    -   Los grupos `baremo_emociones_adaptativas` no están equitativamente distribuidos.
 
-for (element in baremo_colnames) {
+```{r message=TRUE, warning=TRUE}
+
+for (element in baremo_colnames[1:5]) {
   print(df_congreso_clean %>%
     ggbetweenstats(
       x = !!element,
@@ -265,21 +261,26 @@ for (element in baremo_colnames) {
       na.rm = TRUE
     ))
 }
+
+
 ```
 
 ### Estado Civil
+
+No utilizaría esta variable porque hay grupos muy pequeños (e.g. `viudo`) y la única diferencia estadísticamente significativa es entre los niveles `Soltero`y`Casado`. Los participantes solteros tuvieron en promedio mayor ansiedad que los sujetos casados con un 95% de confianza.
 
 ```{r}
 
 
 # Estado civil
-shapiro.test(df_congreso_clean$ansiedad_estado)
-
 df_congreso_clean %>%
   ggbetweenstats(x = estado_civil, y = ansiedad_estado, effsize.type = "eta")
 
 
-aov(ansiedad_estado ~ estado_civil, data = df_congreso_clean) %>% TukeyHSD()
+aov_ansiedad_estcivil <- aov(ansiedad_estado ~ estado_civil, data = df_congreso_clean) 
+
+aov_ansiedad_estcivil %>% summary()
+aov_ansiedad_estcivil %>% TukeyHSD()
 ```
 
 ### Situación económica percepción
@@ -292,12 +293,11 @@ df_congreso_clean %>%
 
 
 aov_ansiedad_siteconomica <- t.test(ansiedad_estado ~ percibe_situacion_economica_personal, data = df_congreso_clean)
-aov_ansiedad_siteconomica
 
-aov_ansiedad_siteconomica %>% summary()
-aov_ansiedad_siteconomica %>% TukeyHSD()
+aov_ansiedad_siteconomica
 ```
-### Regresión Lineal 
+
+### Regresión Lineal
 
 TODO: Hay demasiada multicolinearidad en el modelo.
 
@@ -312,7 +312,6 @@ df_congreso_modelling <- df_congreso_clean %>%
     -ansiedad_rasgo
   )
 
-df_congreso_modelling %>% cor()
 
 lm_ansiedad_all <- lm(ansiedad_estado ~ ., data = df_congreso_modelling)
 
