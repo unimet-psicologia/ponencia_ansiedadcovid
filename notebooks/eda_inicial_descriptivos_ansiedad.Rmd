@@ -3,8 +3,11 @@ title: "EDA - Primer Pase"
 output:
   html_document:
     df_print: paged
+    toc: true
+    theme: united
   html_notebook: default
   pdf_document: default
+
 ---
 
 ```{r, echo = FALSE, message=FALSE, warning=FALSE}
