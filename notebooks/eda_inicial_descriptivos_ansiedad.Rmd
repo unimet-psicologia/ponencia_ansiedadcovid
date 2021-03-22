@@ -1,0 +1,324 @@
+---
+title: "EDA - Primer Pase"
+output:
+  html_document:
+    df_print: paged
+    toc: true
+    theme: united
+  html_notebook: default
+  pdf_document: default
+
+---
+
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+
+# Libraries
+
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(visdat)
+library(stringr)
+library(stringi)
+library(skimr)
+library(ggstatsplot)
+
+# Read dataset
+df_congreso <- read_excel("../data/raw/Congreso.xlsx", sheet = "final")
+df_congreso_original <- read_excel("../data/raw/Congreso.xlsx", sheet = "Compilado")
+
+# Convertir baremos a factores
+df_congreso <- df_congreso %>%
+  select(-baremo_emocional_inteligencia_)
+
+baremo_colnames <- df_congreso %>%
+  select(starts_with("baremo")) %>%
+  colnames()
+
+df_congreso[baremo_colnames] <- lapply(df_congreso[baremo_colnames], as.factor)
+
+
+# Convertir graffar a factor
+
+graffar_colnames <- df_congreso %>%
+  select(starts_with("graff")) %>%
+  colnames()
+
+df_congreso[graffar_colnames] <- lapply(df_congreso[graffar_colnames], as.factor)
+
+# Convertir columnas de percepcion a factor
+
+percibe_colnames <- df_congreso %>%
+  select(starts_with("percibe")) %>%
+  colnames()
+
+df_congreso[percibe_colnames] <- lapply(df_congreso[percibe_colnames], as.factor)
+
+# Convertir columnas de
+
+
+misc_colnames_factor <- c(
+  "desea_emigrar",
+  "nucleo_familiar_venezuela",
+  "sexo",
+  "estado_civil",
+  "periodo",
+  "nivel_educativo"
+)
+
+
+df_congreso[misc_colnames_factor] <- lapply(df_congreso[misc_colnames_factor], as.factor)
+
+
+# Convertir a Numeric
+
+misc_colnames_numeric <- c("ingreso_aproximado_familia_usd", "ingreso_mensual_usd")
+
+df_congreso[misc_colnames_numeric] <- lapply(df_congreso[misc_colnames_numeric], as.numeric)
+
+# Data Wrangling
+
+# Cambiar nombre de columnas a un formato comun
+colnames(df_congreso) <- df_congreso %>%
+  colnames() %>%
+  tolower() %>%
+  str_replace_all(" ", "_") %>% # Reemplazar espacios en blanco por underscores
+  str_replace_all("\\[|\\]|\\?|\\¿|\\(|\\)|\\,", "") %>% # Eliminar caracteres raros
+  stri_trans_general("Latin-ASCII") # Eliminar tildes
+```
+
+# Exploración de Datos
+
+## Exploración de datos inicial
+
+### Valores ausentes
+
+Las variables con mayor cantidad de valores ausnetes son `estado_civil` e `ingreso_mensual_usd`. Actualmente no contamos con el baremo de inteligencia emocional, eso por esto que todos lo valores de esta columna se encuentran nulos.
+
+```{r fig.height=7, message=FALSE, warning=FALSE}
+
+# Cantidad de Valores Nulos según columna
+df_congreso %>%
+  vis_miss() +
+  theme(axis.text.x = element_text(angle = 45)) +
+  theme(plot.margin = unit(c(2, 3, 1.5, 1.2), "cm"))
+```
+
+### Outliers
+
+Variables que se ven más afectadas por outliers:
+
+-   `ingreso_aproximado_familia_usd`
+-   `ingreso_mensual_usd`
+-   `ansiedad_rasgo`
+-   `emociones_adaptativas`
+-   `ansiedad_estado`
+-   `regulacion_emocional`
+
+```{r}
+
+
+# Seleccionar variables numericas para encontrar outliers univariados
+df_congreso_numeric_vars <- df_congreso %>%
+  select_if(is.numeric)
+
+
+# Explorar que columnas tienen una mayor cantidad de outliers
+outliers_univariate <- dlookr::diagnose_outlier(df_congreso)
+
+outliers_univariate <- outliers_univariate %>%
+  arrange(desc(outliers_cnt)) %>%
+  filter(outliers_cnt > 1)
+
+
+df_congreso[outliers_univariate$variables] %>%
+  summary()
+```
+
+#### Outliers por variable:
+
+-   `ingreso_aproximado_familia_usd`: Es la variable más problemática a nivel de Outliers.
+
+    -   Un sujeto ingresó un ingreso familiar de `2.719383e+34`. Se ha eliminado este valor
+    -   Método de imputación: Eliminar
+
+```{r}
+df_congreso %>%
+  dlookr::plot_outlier()
+```
+
+```{r}
+
+get_outlier_threshold <- function(dataframe, variable_name) {
+  q1 <- quantile(dataframe[[variable_name]], 0.25, names = FALSE, na.rm = TRUE) # Cuartil 1
+  q3 <- quantile(dataframe[[variable_name]], 0.75, names = FALSE, na.rm = TRUE) # Cuartil 2
+
+  iqr <- q3 - q1 # Rango Intercuartil
+
+  low_bound_threshold <- q1 - 1.5 * iqr # Threshold para valores muy pequeños
+  hi_bound_threshold <- q3 + 1.5 * iqr # Threshold para valores muy grandes
+
+
+  return(c(low_bound_threshold, hi_bound_threshold))
+}
+
+
+# Detectar los thresholds para outliers
+out_ingreso_familiar_thresh <- get_outlier_threshold(df_congreso, "ingreso_aproximado_familia_usd")
+out_ingreso_mensual_thresh <- get_outlier_threshold(df_congreso, "ingreso_mensual_usd")
+
+## Verificando que estoy haciendo subset de los valores correctos
+
+# df_congreso %>%
+#   filter(ingreso_aproximado_familia_usd > out_ingreso_familiar_thresh[2]) %>%
+#   select(ingreso_aproximado_familia_usd)
+# 
+# df_congreso %>%
+#   filter(ingreso_mensual_usd > out_ingreso_mensual_thresh[2]) %>%
+#   select(ingreso_mensual_usd) %>%
+#   arrange(desc(ingreso_mensual_usd))
+
+
+# Reeemplazar dichos valores con NA
+df_congreso_clean <- df_congreso %>%
+  mutate(ingreso_aproximado_familia_usd = ifelse(ingreso_aproximado_familia_usd > out_ingreso_familiar_thresh[2], NA, ingreso_aproximado_familia_usd))
+
+df_congreso_clean <- df_congreso %>%
+  mutate(ingreso_aproximado_familia_usd = ifelse(ingreso_mensual_usd > out_ingreso_mensual_thresh[2], NA, ingreso_mensual_usd))
+```
+
+## Análisis descriptivo univariante
+
+### Período
+
+```{r}
+
+```
+
+### Ansiedad
+
+```{r}
+
+```
+
+## Supuestos
+
+Ansiedad estado es estadísticamente significativo
+
+```{r}
+shapiro.test(df_congreso_clean$ansiedad_estado)
+```
+
+## Comparación de Medias
+
+### Período
+
+El período únicamente tiene una relación estadísticamente significativa con la `ansiedad_estado` y `regulacion_emocional`. **No** continuaré analizando el `período` como ha sido segmentado en la data recolectada.
+
+```{r}
+
+
+
+df_congreso_clean %>%
+  ggbetweenstats(x = periodo, y = ansiedad_rasgo)
+
+
+df_congreso_clean %>%
+  ggbetweenstats(x = periodo, y = ansiedad_rasgo, effsize.type = "eta")
+
+df_congreso_clean %>%
+  ggbetweenstats(x = periodo, y = ansiedad_estado, effsize.type = "eta")
+
+
+df_congreso_clean %>%
+  ggbetweenstats(x = periodo, y = inteligencia_emocional, effsize.type = "eta")
+
+df_congreso_clean %>%
+  ggbetweenstats(x = periodo, y = emociones_adaptativas, effsize.type = "eta")
+
+
+df_congreso_clean %>%
+  ggbetweenstats(x = periodo, y = inteligencia_emocional, effsize.type = "eta")
+
+
+df_congreso_clean %>%
+  ggbetweenstats(x = periodo, y = regulacion_emocional, effsize.type = "eta")
+
+df_congreso_clean %>%
+  ggbetweenstats(x = periodo, y = atencion_emocional, effsize.type = "eta")
+```
+
+### VI: Variables Baremo VD: Ansiedad
+
+-   `braemo_emociones_adaptativas` tiene `p valor` sumamente bajo y un eta cuadrado parcial fuerte.
+
+    -   Posibles problemas:
+    -   Los grupos `baremo_emociones_adaptativas` no están equitativamente distribuidos.
+
+```{r message=TRUE, warning=TRUE}
+
+for (element in baremo_colnames[1:5]) {
+  print(df_congreso_clean %>%
+    ggbetweenstats(
+      x = !!element,
+      y = ansiedad_estado,
+      effsize.type = "eta",
+      na.rm = TRUE
+    ))
+}
+
+
+```
+
+### Estado Civil
+
+No utilizaría esta variable porque hay grupos muy pequeños (e.g. `viudo`) y la única diferencia estadísticamente significativa es entre los niveles `Soltero`y`Casado`. Los participantes solteros tuvieron en promedio mayor ansiedad que los sujetos casados con un 95% de confianza.
+
+```{r}
+
+
+# Estado civil
+df_congreso_clean %>%
+  ggbetweenstats(x = estado_civil, y = ansiedad_estado, effsize.type = "eta")
+
+
+aov_ansiedad_estcivil <- aov(ansiedad_estado ~ estado_civil, data = df_congreso_clean) 
+
+aov_ansiedad_estcivil %>% summary()
+aov_ansiedad_estcivil %>% TukeyHSD()
+```
+
+### Situación económica percepción
+
+Parece que la percepción sobre la situación económica personal tiene un efecto mediano en el estado de ansiedad.
+
+```{r}
+df_congreso_clean %>%
+  ggbetweenstats(x = percibe_situacion_economica_personal, y = ansiedad_estado, effsize.type = "eta")
+
+
+aov_ansiedad_siteconomica <- t.test(ansiedad_estado ~ percibe_situacion_economica_personal, data = df_congreso_clean)
+
+aov_ansiedad_siteconomica
+```
+
+### Regresión Lineal
+
+TODO: Hay demasiada multicolinearidad en el modelo.
+
+```{r}
+
+
+df_congreso_modelling <- df_congreso_clean %>%
+  select(
+    -nombre,
+    -apellido,
+    -starts_with("baremo_ansiedad"),
+    -ansiedad_rasgo
+  )
+
+
+# lm_ansiedad_all <- lm(ansiedad_estado ~ ., data = df_congreso_modelling)
+
+# car::vif(lm_ansiedad_all)
+```
