@@ -7,7 +7,6 @@ output:
     theme: united
   html_notebook: default
   pdf_document: default
-
 ---
 
 ```{r, echo = FALSE, message=FALSE, warning=FALSE}
@@ -184,28 +183,36 @@ df_congreso_clean <- df_congreso %>%
   mutate(ingreso_aproximado_familia_usd = ifelse(ingreso_aproximado_familia_usd > out_ingreso_familiar_thresh[2], NA, ingreso_aproximado_familia_usd))
 
 df_congreso_clean <- df_congreso %>%
-  mutate(ingreso_aproximado_familia_usd = ifelse(ingreso_mensual_usd > out_ingreso_mensual_thresh[2], NA, ingreso_mensual_usd))
+  mutate(ingreso_mensual_usd = ifelse(ingreso_mensual_usd > out_ingreso_mensual_thresh[2], NA, ingreso_mensual_usd))
+
+df_congreso_clean %>% 
+  ggplot(aes(y = ansiedad_estado,
+             x = ingreso_mensual_usd)) +
+  geom_point()
+
+# cor.test(df_congreso_clean$ansiedad_estado, df_congreso$ingreso_mensual_usd)
+
 ```
 
 ## Análisis descriptivo univariante
-
-### Período
-
-```{r}
-
-```
-
-### Ansiedad
+aa
+### Ingreso mensual 
 
 ```{r}
 
+df_congreso_clean %>% 
+  ggplot(aes(x = ingreso_mensual_usd)) +
+  geom_histogram()
+
 ```
+
+
 
 ## Supuestos
 
 Ansiedad estado es estadísticamente significativo
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 shapiro.test(df_congreso_clean$ansiedad_estado)
 ```
 
@@ -255,6 +262,20 @@ df_congreso_clean %>%
     -   Posibles problemas:
     -   Los grupos `baremo_emociones_adaptativas` no están equitativamente distribuidos.
 
+-   Ansiedad estado:
+
+    -   Es lo físico.
+
+-   Ansiedad rasgo:
+
+    -   Personalidad.
+
+-   Emociones adaptativas:
+
+    -   Capacidad para manejar las demandas del entorno. Relación ansiedad rasgo y estado.
+
+-   
+
 ```{r message=TRUE, warning=TRUE}
 
 for (element in baremo_colnames[1:5]) {
@@ -266,6 +287,13 @@ for (element in baremo_colnames[1:5]) {
       na.rm = TRUE
     ))
 }
+
+df_congreso_clean$baremo_emocional_compresion
+
+aov_ansiedad_emoadapt<- aov(ansiedad_estado ~ baremo_emociones_adaptativas * baremo_emocional_compresion, data = df_congreso_clean) 
+
+aov_ansiedad_emoadapt %>% summary()
+aov_ansiedad_emoadapt %>% TukeyHSD()
 
 
 ```
@@ -322,3 +350,55 @@ df_congreso_modelling <- df_congreso_clean %>%
 
 # car::vif(lm_ansiedad_all)
 ```
+
+## Posibles insights y Next Steps
+
+### Posibles insights
+
+-   **Emociones adaptativas:**
+
+    -   Mayor puntaje en emociones adaptativas, tienen un mayor grado de ansiedad.
+
+    -   Teoría: Tiene una relación directa. Al tener una mayor regulación emocional porque quizás tienes más conciencia de lo que sucede.
+
+        -   Buscar estudios de África por la relación socio económica con Venezuela
+        -   Las capacidades del Yo que tiene el sujeto.
+
+    -   Next steps:
+
+        -   Evaluar a nivel teórico qué tanto le podemos sacar el jugo a esto.
+        -   Corroborarlo con Gustavo.
+
+-   **Percepción económica:**
+
+    -   Las personas que perciben de manera positiva su situación económica tienden a tener mayor ansiedad en la época covid.
+
+    -   Next steps:
+
+        -   Incluir la canasta básica u otra heurística como salario miseria. @guille
+        -   Evaluar la relación entre estas otras heurísticas con ansiedad estado.
+
+-   **Variable temporal (timestamp):**
+
+    -   Time series analysis.
+
+    -   Next steps:
+
+        -   Incluir el timestamp en la data.
+
+### Next steps 
+
+Decidimos enfocarnos en entender cómo las variables socioeconómicas se relacionan con `ansiedad_estado` en el contexto de pandemia en Venezuela. Es debido a esto que estructuraremos la ponencia de la siguiente manera:
+
+-   **Estructura de la ponencia**
+
+    1.  Distribución de las variables
+
+        1.  EDA Univariado y Bivariado
+        2.  Todas las variables relacionadas a ingresos y estatus socioeconomico + `ansiedad_estado`
+
+    2.  Cosas que encontramos estadísticamente significativo
+
+        -   Enfocarnos en esto porque es más relevante a nivel de justificación (relevancia social).
+
+    3.  Entrar en la teoría
