@@ -1,5 +1,9 @@
 ---
-title: "Ponencia Asincrónica (Resultados) - Congreso Venezolano de Psicología III"
+title: "Ansiedad e Inteligencia Emocional en Caracas durante el periodo pre y post confinamiento por COVID19 (enero a junio del 2020)"
+subtitle: "Ponencia Asincrónica - III Congreso Venezolano de Psicología"
+author:
+- Diego Gimenez
+- Guillermo Medici
 output:
   html_document:
     df_print: paged
@@ -7,7 +11,6 @@ output:
     toc_float: true
     theme: cosmo
     code_folding: hide
-  pdf_document: default
 ---
 
 # Resumen
