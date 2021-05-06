@@ -1,14 +1,48 @@
 ---
-title: "3.0-eda_sociodemografico_onu"
+title: "Ponencia Asincrónica (Resultados) - Congreso Venezolano de Psicología III"
 output:
   html_document:
     df_print: paged
     toc: true
-    theme: united
+    toc_float: true
+    theme: cosmo
+    code_folding: hide
   pdf_document: default
 ---
 
-```{r, echo = FALSE, message=FALSE, warning=FALSE}
+# Resumen
+
+## Objetivo
+
+La presente investigación tuvo los siguientes objetivos:
+
+1.  Analizar la relación entre los constructos Ansiedad e Inteligencia Emocional.
+
+2.  Comparar el factor Ansiedad Estado de los Caraqueños antes y luego de la implementación medidas de confinamiento a raíz de la pandemia provocada por SARS-CoV-2.
+
+## Método
+
+Alcance correlacional, diseño no experimental de corte transversal. Población correspondió al Área Metropolitana de Caracas, el tipo de muestreo fue no probabilístico por cuotas (género). Se recolectaron 1761 sujetos . 
+
+Se utilizaron los siguientes instrumentos psicológicos: 
+
+-   Constructo: Ansiedad
+
+    -   Instrumento: STAI, validación Caraqueña (Armas y Gomez, 2020).
+
+-   Constructo: Inteligencia Emocional.
+
+    -   Instrumento: TMMS-24, validación Caraqueña (Cárdenas y López, 2020).
+
+## Resultados
+
+-   Correlación de Pearson fuerte y positiva entre el factor Ansiedad Estado y el constructo el factor Emociones Adaptativas (r = 0.75, p-valor = 1.09e-313)
+
+-   Correlación de Pearson moderada entre el factor Emociones Adaptativas y el constructo Inteligencia Emocional (r = 0.35, p-valor =  2.2e-16). 
+
+-   Se utilizó T de Student para comparación de medias. Se encontró una diferencia  estadísticamente significativa del promedio de ansiedad estado antes y después del confinamiento (p-valor = 4.36e-4, D Cohen = 0.17). En otras palabras, antes del confinamiento los sujetos tenían un menor nivel de ansiedad. 
+
+```{r, echo = TRUE, message=FALSE, warning=FALSE}
 
 # Libraries
 
@@ -151,7 +185,7 @@ Variables que no se ven tan afectadas por outliers:\
 
 -   `emociones_adaptativas`: Se reemplazaron los valores atípicos con `NA`. Estos valores son omitidos por el resto del presente análisis.
 
-```{r, echo=FALSE, fig.height=4, message=FALSE, warning=FALSE}
+```{r echo=TRUE, fig.height=4, message=FALSE, warning=FALSE}
 df_congreso %>%
   dlookr::plot_outlier()
 ```
@@ -210,7 +244,7 @@ df_congreso_clean %>%
 
 -   Hemos considerado a estos outliers como representativos de la población.
 
-```{r echo=FALSE, fig.height=4, message=FALSE, warning=FALSE}
+```{r echo=TRUE, fig.height=4, message=FALSE, warning=FALSE}
 
 df_congreso_clean %>% 
   ggplot(aes(y = ingreso_mensual_usd)) +
@@ -230,7 +264,7 @@ df_congreso_clean %>%
 
 -   Hemos considerado a estos outliers como representativos de la población.
 
-```{r echo=FALSE, fig.height=5, fig.width=8, message=FALSE, warning=FALSE}
+```{r echo=TRUE, fig.height=5, fig.width=8, message=FALSE, warning=FALSE}
 
 # df_congreso_clean %>% 
 #   ggplot(aes(y = ingreso_aproximado_familia_usd)) +
@@ -247,7 +281,7 @@ df_congreso_clean %>%
 
 ### Percepcion economica pais
 
-```{r echo=FALSE, fig.height=4, fig.width=7, message=FALSE, warning=FALSE}
+```{r echo=TRUE, fig.height=4, fig.width=7, message=FALSE, warning=FALSE}
 
 
 
@@ -269,7 +303,7 @@ tbl_percibe_sit
 
 ### Percepcion economica personal
 
-```{r, echo=FALSE, fig.height=4, message=FALSE, warning=FALSE}
+```{r, echo=TRUE, fig.height=4, message=FALSE, warning=FALSE}
 df_congreso_clean %>% 
   ggplot(aes(x = percibe_situacion_economica_personal, fill = ..count..)) +
   geom_bar() +
@@ -283,7 +317,7 @@ df_congreso_clean %>%
 
 ### Escala Graffar
 
-```{r, echo=FALSE, fig.height=4, message=FALSE, warning=FALSE}
+```{r, echo=TRUE, fig.height=4, message=FALSE, warning=FALSE}
 df_congreso_clean %>% 
   ggplot(aes(graff_estrato)) +
   geom_bar()
@@ -359,7 +393,7 @@ prop.table(table(df_congreso_clean$nivel_educativo)) %>% kable()
 
 -   No existe una relación estadísticamente significativa entre esta variable y `ansiedad_estado`
 
-```{r, echo=FALSE, fig.height=4, message=FALSE, warning=FALSE}
+```{r, echo=TRUE, fig.height=4, message=FALSE, warning=FALSE}
 
 df_congreso_clean %>% 
   ggplot(aes(x = ingreso_mensual_usd, y = ansiedad_estado)) +
@@ -373,7 +407,7 @@ cor.test(df_congreso_clean$ingreso_mensual_usd, df_congreso_clean$ansiedad_estad
 
 -   No existe una relación estadísticamente significativa entre esta variable y `ansiedad_estado`
 
-```{r, echo=FALSE, fig.height=4, message=FALSE, warning=FALSE}
+```{r, echo=TRUE, fig.height=4, message=FALSE, warning=FALSE}
 df_congreso_clean %>% 
   ggplot(aes(x = ingreso_aproximado_familia_usd, y = ansiedad_estado)) +
   geom_point()
@@ -386,7 +420,7 @@ cor.test(df_congreso_clean$ingreso_aproximado_familia_usd, df_congreso_clean$ans
 
 -   No existe una relación estadísticamente significativa entre esta variable y `ansiedad_estado`
 
-```{r, echo=FALSE, fig.height=4, message=FALSE, warning=FALSE}
+```{r, echo=TRUE, fig.height=4, message=FALSE, warning=FALSE}
 df_congreso_clean %>% 
   ggplot(aes(x = percibe_situacion_economica_actual_pais, y = ansiedad_estado)) +
   geom_boxplot()
@@ -413,7 +447,7 @@ df_congreso_clean %>%
     -   V de cramer = 0.16, chisq p valor = 1.553e-10
     -   D de Cohen: 0.3, p valor = 1.54e-9
 
-```{r, echo=FALSE, fig.height=4, message=FALSE, warning=FALSE}
+```{r, echo=TRUE, fig.height=4, message=FALSE, warning=FALSE}
 
 # Boxplot
 df_congreso_clean %>% 
@@ -440,7 +474,7 @@ df_congreso_clean %>%
 
 -   El nivel socioeconomico según la escala graffar no es dependiente con la ansiedad.
 
-```{r, echo=FALSE, fig.height=4, message=FALSE, warning=FALSE}
+```{r, echo=TRUE, fig.height=4, message=FALSE, warning=FALSE}
 df_congreso_clean %>% 
   ggplot(aes(x = graff_estrato, y = ansiedad_estado)) +
   geom_boxplot()
@@ -455,7 +489,7 @@ chisq.test(df_congreso_clean$baremo_ansiedad_estado, df_congreso_clean$graff_est
 cor.test(df_congreso_clean$ansiedad_estado, df_congreso_clean$graff_total)
 ```
 
-#### Periodo
+#### Periodo - Objetivo 2
 
 ```{r}
 df_congreso_clean %>%
@@ -465,13 +499,19 @@ df_congreso_clean %>%
   transmute(ansiedad_estado - ansiedad_rasgo)
 ```
 
-### Variables psicológicas
+### Correlación entre Variables psicológicas: Objetivo 1
+
+**Correlaciones notables:**
+
+-   `ansiedad_estado` y `emociones_adaptativas`
+
+-   `inteligencia_emocional` y `emociones_adaptativas`
 
 ```{r}
 
 df_congreso_clean %>% 
   select(ansiedad_estado,ansiedad_rasgo, emociones_adaptativas, inteligencia_emocional, regulacion_emocional, comprension_emocional, atencion_emocional) %>% 
-  na.omit() %>% 
+  na.omit() %>% # Omitir valores ausentes
   cor(method = "pearson")
 
 cor.test(df_congreso_clean$ansiedad_estado, df_congreso_clean$emociones_adaptativas)
@@ -499,12 +539,14 @@ ggstatsplot::ggscatterstats(data = df_congreso_clean,
 
 ## Supuestos
 
-### Normalidad de VD - `ansiedad_estado`
+### Normalidad de variables
 
--   La VD tiene una distribución normal
+-   Normalidad de variables con correlación moderada o alta correlación
 
-```{r echo=FALSE, fig.height=4, message=FALSE, warning=FALSE}
+```{r echo=TRUE, fig.height=4, message=FALSE, warning=FALSE}
 shapiro.test(df_congreso_clean$ansiedad_estado)
 shapiro.test(df_congreso_clean$emociones_adaptativas)
+shapiro.test(df_congreso_clean$inteligencia_emocional)
+
 
 ```
