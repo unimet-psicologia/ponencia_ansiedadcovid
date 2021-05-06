@@ -1,0 +1,510 @@
+---
+title: "3.0-eda_sociodemografico_onu"
+output:
+  html_document:
+    df_print: paged
+    toc: true
+    theme: united
+  pdf_document: default
+---
+
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+
+# Libraries
+
+library(readxl)
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(visdat)
+library(stringr)
+library(stringi)
+library(skimr)
+library(ggstatsplot)
+library(kableExtra)
+# Read dataset
+df_congreso <- read_excel("../data/raw/Congreso.xlsx", sheet = "final")
+df_congreso_original <- read_excel("../data/raw/Congreso.xlsx", sheet = "Compilado")
+df_congreso_procesada <- read_csv("../data/interim/data_congreso_procesada.csv")
+
+# Convertir baremos a factores
+df_congreso <- df_congreso %>%
+  select(-baremo_emocional_inteligencia_)
+
+baremo_colnames <- df_congreso %>%
+  select(starts_with("baremo")) %>%
+  colnames()
+
+df_congreso[baremo_colnames] <- lapply(df_congreso[baremo_colnames], as.factor)
+
+
+# Convertir graffar a factor
+
+graffar_colnames <- df_congreso %>%
+  select(starts_with("graff")) %>%
+  colnames()
+
+df_congreso[graffar_colnames] <- lapply(df_congreso[graffar_colnames], as.factor)
+
+  # Calcular escala graffar
+df_congreso <- df_congreso %>% 
+  rowwise() %>% 
+  mutate(graff_total = sum(c(graff_condiciones_vivienda, graff_fuente_ingreso_familia, graff_nivel_instruccion_madre, graff_profesion_jefe_familia)))
+
+df_congreso <- df_congreso %>% 
+  mutate(graff_estrato = case_when(graff_total >= 4 & graff_total <= 6 ~ 1,
+                      graff_total >= 7 & graff_total <= 9 ~ 2,
+                      graff_total >= 10 & graff_total <= 12 ~ 3,
+                      graff_total >= 13 & graff_total <= 16 ~ 4,
+                      graff_total >= 17 ~ 5))
+
+df_congreso$graff_estrato <- 
+  factor(df_congreso$graff_estrato, levels = c(1,2,3,4,5), labels = c("estrato_1", "estrato_2", "estrato_3", "estrato_4", "estrato_5"), ordered = TRUE)
+
+# Convertir columnas de percepcion a factor
+
+percibe_colnames <- df_congreso %>%
+  select(starts_with("percibe")) %>%
+  colnames()
+
+df_congreso[percibe_colnames] <- lapply(df_congreso[percibe_colnames], factor,levels = c(0,1), labels = c("negativa","positiva"))
+
+
+# Convertir el resto de columnas a factor
+
+
+misc_colnames_factor <- c(
+  "desea_emigrar",
+  "nucleo_familiar_venezuela",
+  "sexo",
+  "estado_civil",
+  "periodo",
+  "nivel_educativo"
+)
+
+
+df_congreso[misc_colnames_factor] <- lapply(df_congreso[misc_colnames_factor], as.factor)
+
+
+# Convertir ingreso (ONU) a factor
+
+df_congreso_procesada$ingreso <- factor(df_congreso_procesada$ingreso, 
+       levels = c(1,2,3),
+       labels = c("salario_miseria","salario_minimo_brasil","cubre_canasta_alimentaria"))
+
+# Convertir a Numeric
+
+misc_colnames_numeric <- c("ingreso_aproximado_familia_usd", "ingreso_mensual_usd")
+
+df_congreso[misc_colnames_numeric] <- lapply(df_congreso[misc_colnames_numeric], as.numeric)
+
+# Data Wrangling
+
+# Cambiar nombre de columnas a un formato comun
+colnames(df_congreso) <- df_congreso %>%
+  colnames() %>%
+  tolower() %>%
+  str_replace_all(" ", "_") %>% # Reemplazar espacios en blanco por underscores
+  str_replace_all("\\[|\\]|\\?|\\¿|\\(|\\)|\\,", "") %>% # Eliminar caracteres raros
+  stri_trans_general("Latin-ASCII") # Eliminar tildes
+```
+
+# Exploración de Datos
+
+## Exploración de datos inicial
+
+### Valores ausentes
+
+Las variables con mayor cantidad de valores ausentes son `estado_civil` e `ingreso_mensual_usd`. Estas variables no se incluyeron en el análisis de datos. Es importante resaltar que los sujetos **no** fueron eliminados.
+
+```{r echo=TRUE, fig.height=7, message=FALSE, warning=FALSE}
+
+# Cantidad de Valores Nulos según columna
+df_congreso %>%
+  vis_miss() +
+  theme(axis.text.x = element_text(angle = 45)) +
+  theme(plot.margin = unit(c(2, 3, 1.5, 1.2), "cm")) + 
+  labs(title = "Valores Ausentes")
+```
+
+### Outliers
+
+Variables que se ven más afectadas por outliers:\
+*La distribución de las siguientes variables **cambian** de manera drástica al excluir los outliers.*
+
+-   `ingreso_aproximado_familia_usd`
+-   `emociones_adaptativas`
+
+Variables que no se ven tan afectadas por outliers:\
+*La distribución de las siguientes variables **no** cambian de manera drástica al excluir outliers.*
+
+-   `ingreso_mensual_usd`
+-   `ansiedad_rasgo`
+-   `ansiedad_estado`
+-   `regulacion_emocional`
+
+#### Métodos de imputación para variables afectadas por outliers
+
+-   `ingreso_aproximado_familia_usd`: Es la variable más problemática a nivel de Outliers.
+
+    -   Un sujeto ingresó un ingreso familiar de \$`2.719383e+34`. Se ha eliminado este valor. El resto de los outliers fueron incluidos en la muestra porque se consideran que son representativos de la población.
+
+-   `emociones_adaptativas`: Se reemplazaron los valores atípicos con `NA`. Estos valores son omitidos por el resto del presente análisis.
+
+```{r, echo=FALSE, fig.height=4, message=FALSE, warning=FALSE}
+df_congreso %>%
+  dlookr::plot_outlier()
+```
+
+```{r echo=TRUE, fig.height=4, message=FALSE, warning=FALSE}
+
+get_outlier_threshold <- function(dataframe, variable_name) {
+  q1 <- quantile(dataframe[[variable_name]], 0.25, names = FALSE, na.rm = TRUE) # Cuartil 1
+  q3 <- quantile(dataframe[[variable_name]], 0.75, names = FALSE, na.rm = TRUE) # Cuartil 2
+
+  iqr <- q3 - q1 # Rango Intercuartil
+
+  low_bound_threshold <- q1 - 1.5 * iqr # Threshold para valores muy pequeños
+  hi_bound_threshold <- q3 + 1.5 * iqr # Threshold para valores muy grandes
+
+
+  return(c(low_bound_threshold, hi_bound_threshold))
+}
+
+
+# Detectar los thresholds para outliers
+out_ingreso_familiar_thresh <- get_outlier_threshold(df_congreso, "ingreso_aproximado_familia_usd")
+out_ingreso_mensual_thresh <- get_outlier_threshold(df_congreso, "ingreso_mensual_usd")
+out_emociones_adaptativas <- get_outlier_threshold(df_congreso, "emociones_adaptativas")
+
+# Reeemplazar dichos valores con NA
+
+df_congreso_clean <- df_congreso
+
+
+df_congreso_clean$ingreso_aproximado_familia_usd[df_congreso_clean$ingreso_aproximado_familia_usd > out_ingreso_familiar_thresh[2]] <- NA
+
+df_congreso_clean$ingreso_mensual_usd[df_congreso_clean$ingreso_mensual_usd > out_ingreso_mensual_thresh[2]] <- NA
+
+df_congreso_clean$emociones_adaptativas[df_congreso_clean$emociones_adaptativas > out_emociones_adaptativas[2]] <- NA
+df_congreso_clean$emociones_adaptativas[df_congreso_clean$emociones_adaptativas < out_emociones_adaptativas[1]] <- NA
+
+
+# Chequeando que los v
+
+df_congreso_clean %>% 
+  ggplot(aes(y = ingreso_aproximado_familia_usd)) +
+  geom_boxplot()
+
+
+
+df_congreso_clean %>% 
+  ggplot(aes(y = emociones_adaptativas)) +
+  geom_boxplot()
+
+```
+
+## Análisis descriptivo univariante
+
+### Ingreso mensual
+
+-   Hemos considerado a estos outliers como representativos de la población.
+
+```{r echo=FALSE, fig.height=4, message=FALSE, warning=FALSE}
+
+df_congreso_clean %>% 
+  ggplot(aes(y = ingreso_mensual_usd)) +
+  geom_boxplot()
+
+df_congreso_clean %>% 
+  ggplot(aes(x = ingreso_mensual_usd, fill = ..count..)) +
+  geom_histogram() + 
+  labs(title = "Distribución de Ingreso Mensual (USD)") + 
+  xlab("Ingreso Mensual (USD)") 
+
+
+
+```
+
+### Ingreso mensual familiar
+
+-   Hemos considerado a estos outliers como representativos de la población.
+
+```{r echo=FALSE, fig.height=5, fig.width=8, message=FALSE, warning=FALSE}
+
+# df_congreso_clean %>% 
+#   ggplot(aes(y = ingreso_aproximado_familia_usd)) +
+#   geom_boxplot()
+
+df_congreso_clean %>% 
+  ggplot(aes(x = ingreso_aproximado_familia_usd, fill = ..count..)) +
+  geom_histogram() +
+  labs(title = "Distribución de Ingreso Mensual Familiar Aproximado (USD)") + 
+  xlab("Ingreso Mensual Familiar Aproximado (USD)") 
+
+
+```
+
+### Percepcion economica pais
+
+```{r echo=FALSE, fig.height=4, fig.width=7, message=FALSE, warning=FALSE}
+
+
+
+df_congreso_clean %>% 
+  ggplot(aes(x = percibe_situacion_economica_actual_pais, fill = ..count..)) +
+  geom_bar() +
+  labs(title = "Percepción Situación Económica Actual del País") + 
+  xlab("Percepción") +
+  theme(legend.position = "none") 
+
+
+tbl_percibe_sit <- df_congreso_clean$percibe_situacion_economica_actual_pais %>% 
+  table() %>% 
+  prop.table() * 100
+
+tbl_percibe_sit
+
+```
+
+### Percepcion economica personal
+
+```{r, echo=FALSE, fig.height=4, message=FALSE, warning=FALSE}
+df_congreso_clean %>% 
+  ggplot(aes(x = percibe_situacion_economica_personal, fill = ..count..)) +
+  geom_bar() +
+  labs(title = "Percepción situación económica personal") + 
+  xlab("Percepción") +
+  theme(legend.position = "none") 
+
+
+
+```
+
+### Escala Graffar
+
+```{r, echo=FALSE, fig.height=4, message=FALSE, warning=FALSE}
+df_congreso_clean %>% 
+  ggplot(aes(graff_estrato)) +
+  geom_bar()
+
+tbl_estrato <- df_congreso_clean$graff_estrato %>% 
+  table() %>% 
+  prop.table() * 100
+
+tbl_estrato %>% 
+  round(2) %>% 
+  kable()
+
+```
+
+### Escala de Miseria ONU
+
+```{r}
+df_congreso_procesada %>% 
+  ggplot(aes(x = ingreso)) +
+  geom_bar()
+
+df_congreso_procesada$ingreso %>% table() %>% prop.table() %>% kable()
+```
+
+### Sexo
+
+```{r}
+df_congreso_clean %>% 
+  na.omit() %>% 
+  ggplot(aes(x = sexo, fill = ..count..)) +
+  geom_bar() +
+  labs(title = "Género de la muestra") + 
+  xlab("Género") +
+  theme(legend.position = "none") 
+
+table(df_congreso_clean$sexo)
+
+```
+
+### Periodo
+
+```{r}
+df_congreso_clean %>% 
+  ggplot(aes(x = periodo, fill = ..count..)) +
+  geom_bar() +
+  labs(title = "Cantidad de sujetos por Período") + 
+  xlab("Género") +
+  theme(legend.position = "none") 
+
+df_congreso$periodo %>% 
+  table() %>% 
+  prop.table() %>% 
+  kable()
+```
+
+### Estado Civil
+
+```{r}
+prop.table(table(df_congreso_clean$estado_civil)) * 100 
+```
+
+### Nivel Educativo
+
+```{r}
+prop.table(table(df_congreso_clean$nivel_educativo)) %>% kable()
+```
+
+## Descriptivo Bivariado
+
+### Variables socio demograficas
+
+#### Ingreso mensual personal
+
+-   No existe una relación estadísticamente significativa entre esta variable y `ansiedad_estado`
+
+```{r, echo=FALSE, fig.height=4, message=FALSE, warning=FALSE}
+
+df_congreso_clean %>% 
+  ggplot(aes(x = ingreso_mensual_usd, y = ansiedad_estado)) +
+  geom_point()
+
+cor.test(df_congreso_clean$ingreso_mensual_usd, df_congreso_clean$ansiedad_estado)
+
+```
+
+#### Ingreso mensual familiar
+
+-   No existe una relación estadísticamente significativa entre esta variable y `ansiedad_estado`
+
+```{r, echo=FALSE, fig.height=4, message=FALSE, warning=FALSE}
+df_congreso_clean %>% 
+  ggplot(aes(x = ingreso_aproximado_familia_usd, y = ansiedad_estado)) +
+  geom_point()
+
+cor.test(df_congreso_clean$ingreso_aproximado_familia_usd, df_congreso_clean$ansiedad_estado)
+
+```
+
+#### Percepcion economica pais
+
+-   No existe una relación estadísticamente significativa entre esta variable y `ansiedad_estado`
+
+```{r, echo=FALSE, fig.height=4, message=FALSE, warning=FALSE}
+df_congreso_clean %>% 
+  ggplot(aes(x = percibe_situacion_economica_actual_pais, y = ansiedad_estado)) +
+  geom_boxplot()
+
+# Chi Square
+tbl_siteconpais <- table(df_congreso_clean$baremo_ansiedad_estado, df_congreso_clean$percibe_situacion_economica_actual_pais)
+chisq_siteconpais <- chisq.test(tbl_siteconpais)
+chisq_siteconpais
+DescTools::CramerV(tbl_siteconpais)
+
+# T Test
+aov_ansiedad_siteconomica <- t.test(ansiedad_estado ~ percibe_situacion_economica_actual_pais, data = df_congreso_clean)
+aov_ansiedad_siteconomica
+
+# T Test graph
+df_congreso_clean %>%
+  ggbetweenstats(x = percibe_situacion_economica_actual_pais, y = ansiedad_estado, effsize.type = "eta")
+```
+
+#### Percepcion economica personal
+
+-   Relación fuerte y estadísticamente significativa entre `percibe_sutiacion_economica_personal` y `ansiedad_estado`
+
+    -   V de cramer = 0.16, chisq p valor = 1.553e-10
+    -   D de Cohen: 0.3, p valor = 1.54e-9
+
+```{r, echo=FALSE, fig.height=4, message=FALSE, warning=FALSE}
+
+# Boxplot
+df_congreso_clean %>% 
+  ggplot(aes(x = percibe_situacion_economica_personal, y = ansiedad_estado)) +
+  geom_boxplot()
+
+# Chi Square
+tbl_stieconpersonal <- table(df_congreso_clean$baremo_ansiedad_estado, df_congreso_clean$percibe_situacion_economica_personal)
+chisq_siteconpersonal <- chisq.test(tbl_stieconpersonal)
+chisq_siteconpersonal
+DescTools::CramerV(tbl_stieconpersonal)
+
+# T Test
+aov_ansiedad_siteconomica <- t.test(ansiedad_estado ~ percibe_situacion_economica_personal, data = df_congreso_clean)
+aov_ansiedad_siteconomica
+
+# T Test graph
+df_congreso_clean %>%
+  ggbetweenstats(x = percibe_situacion_economica_personal, y = ansiedad_estado, effsize.type = "eta")
+
+```
+
+#### Escala Graffar
+
+-   El nivel socioeconomico según la escala graffar no es dependiente con la ansiedad.
+
+```{r, echo=FALSE, fig.height=4, message=FALSE, warning=FALSE}
+df_congreso_clean %>% 
+  ggplot(aes(x = graff_estrato, y = ansiedad_estado)) +
+  geom_boxplot()
+
+df_congreso_clean %>% 
+  ggplot(aes(x = graff_total, y = ansiedad_estado)) + 
+  geom_point()
+
+# No son dependientes
+
+chisq.test(df_congreso_clean$baremo_ansiedad_estado, df_congreso_clean$graff_estrato)
+cor.test(df_congreso_clean$ansiedad_estado, df_congreso_clean$graff_total)
+```
+
+#### Periodo
+
+```{r}
+df_congreso_clean %>%
+  ggbetweenstats(x = periodo, y = ansiedad_estado, effsize.type = "eta")
+
+df_congreso_clean %>% 
+  transmute(ansiedad_estado - ansiedad_rasgo)
+```
+
+### Variables psicológicas
+
+```{r}
+
+df_congreso_clean %>% 
+  select(ansiedad_estado,ansiedad_rasgo, emociones_adaptativas, inteligencia_emocional, regulacion_emocional, comprension_emocional, atencion_emocional) %>% 
+  na.omit() %>% 
+  cor(method = "pearson")
+
+cor.test(df_congreso_clean$ansiedad_estado, df_congreso_clean$emociones_adaptativas)
+cor.test(df_congreso_clean$inteligencia_emocional, df_congreso_clean$emociones_adaptativas)
+
+
+```
+
+```{r}
+
+df_congreso_clean %>% 
+  select(ansiedad_estado,ansiedad_rasgo, emociones_adaptativas, inteligencia_emocional, regulacion_emocional, comprension_emocional, atencion_emocional) %>% cor(method = "spearman")
+
+
+ggstatsplot::ggscatterstats(data = df_congreso_clean, 
+                            x = ansiedad_estado,
+                            y = emociones_adaptativas, 
+                            type = "r")
+
+ggstatsplot::ggscatterstats(data = df_congreso_clean, 
+                            x = emociones_adaptativas,
+                            y = inteligencia_emocional, 
+                            type = "r")
+```
+
+## Supuestos
+
+### Normalidad de VD - `ansiedad_estado`
+
+-   La VD tiene una distribución normal
+
+```{r echo=FALSE, fig.height=4, message=FALSE, warning=FALSE}
+shapiro.test(df_congreso_clean$ansiedad_estado)
+shapiro.test(df_congreso_clean$emociones_adaptativas)
+
+```
